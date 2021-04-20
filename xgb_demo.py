@@ -1,8 +1,4 @@
 
-
-import sys
-sys.path.append('C:\\Users\\Newton\\Documents\\Trading\\Numerai\\Demo')
-
 import numeraiutils as num
 import numpy as np
 
@@ -85,4 +81,4 @@ for m in range(15):
          
 td['prediction'] /= 15
 
-num.submit(td, 'nyuton_test9')
+num.submit(td, 'model_name')
