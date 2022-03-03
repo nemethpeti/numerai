@@ -43,8 +43,8 @@ def submit(df, model_name, filename='predictions.csv', version=1):
         
     df[['id', 'prediction']].to_csv(filename, index=False)
     
-    public_id = "NZPMSRC2EJQOIPYR4223JXP2TTS6NMW5"
-    secret_key = "VLM23ZBXIIOAVEW6QNHIDTEH2GGWWCSJKYIPS3CVCB2C3AGJYDEEF65H32W4HNRN"
+    public_id = "xx"
+    secret_key = "xx"
     napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
         
     models = napi.get_models()
