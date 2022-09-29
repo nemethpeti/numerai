@@ -20,7 +20,6 @@ torch.use_deterministic_algorithms(mode=True)
 pd.options.mode.chained_assignment = None  # default='warn'
 
 import numeraiutilsv2 as num
-from numeraiutilsv2 import xgbModel
 
 # In[ data defaults ]
 
@@ -81,46 +80,20 @@ n_features = len(features)
 
 # In[define dataset]
 
-
 class Net(nn.Module):
     def __init__(self, n_features):
         super(Net, self).__init__()
         self.lin1 = nn.Linear(n_features, n_features//2)
         self.lin2 = nn.Linear(n_features//2, n_features//4)
         self.lin3 = nn.Linear(n_features//4, 1)
-              
-        self.do1 = nn.Dropout(0.1)
-        self.do2 = nn.Dropout(0.1)
-        self.do3 = nn.Dropout(0.1)
 
     def forward(self, input):
         
-        layer1 = self.do1(       F.relu(self.lin1(input)))
-        layer2 = self.do2(       F.relu(self.lin2(layer1)))
-        out    = self.do3(torch.sigmoid(self.lin3(layer2)))    # first output, predicting labels
+        layer1 = F.relu(self.lin1(input))
+        layer2 = F.relu(self.lin2(layer1))
+        out    = torch.sigmoid(self.lin3(layer2))
         
         return out
-
-def numerai_corr(pred, target, regularization_strength=.0001):
-    # Computes and returns a Numerai score and feature exposure
-    
-    pred = pred.reshape(1, -1)
-    target = target.reshape(1, -1)
-    
-    # get sorted indicies
-    rr = torchsort.soft_rank(pred, regularization_strength=regularization_strength)
-    # change pred to uniform distribution
-    pred = (rr - .5)/rr.shape[1]
-    
-    # Pearson correlation
-    pred = pred - pred.mean()
-    pred = pred / pred.norm()
-    target = target - target.mean()
-    target = target / target.norm()
-    corr = (pred * target).sum()
-    
-    return corr
-
 
 class NumeraiDataSet(torch.utils.data.IterableDataset):
     
@@ -171,21 +144,19 @@ if __name__=='__main__':
     model=Net(n_features).to(device)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    torch.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
+    myLoss = nn.MSELoss()
     model.train()
 
-    training = NumeraiDataSet(dataDir+'/eraSplit/', 1, 800, features, target)
+    training = NumeraiDataSet(dataDir+'/eraSplit/', 1, 500, features, target)
     training_loader = torch.utils.data.DataLoader(training, num_workers=5, batch_size=1)
 
-    validation = NumeraiDataSet(dataDir+'/eraSplit/', 800, 1028, features, target)
+    validation = NumeraiDataSet(dataDir+'/eraSplit/', 500, 1028, features, target)
     validation_loader = torch.utils.data.DataLoader(validation, num_workers=5, batch_size=1)
 
     
     torch.autograd.set_detect_anomaly(True)
     regularization_strength=.0001
-    epochs=6
+    epochs=10
       
     for epoch in range(epochs):
         print('Epoch', epoch)
@@ -198,23 +169,20 @@ if __name__=='__main__':
             y = torch.squeeze(y).to(device)
     
             # zero gradient buffer and get model output
-            optimizer.zero_grad()
-            model.train()
-            out = model(X)
+            optimizer.zero_grad()            
+            out = model(X).squeeze()
             
-            corr = numerai_corr(out, y)
-            
-            loss = -corr
-    
+            loss = myLoss(out, y)
+              
             loss.backward()
             optimizer.step()
             
             if (ii)%100==0:
-                print(ii, corr.item())
+                print(ii, loss.item())
                 
             
         # end of epoch validation
-        val = pd.DataFrame(columns=['era', 'target', 'pred'], dtype=[str, float, float])
+        val = pd.DataFrame(columns=['era', 'target', 'pred'], dtype=np.float32)
         model.eval()
         with torch.no_grad():
             
